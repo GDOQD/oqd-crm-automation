@@ -1,0 +1,35 @@
+name: Zoho CRM Audit
+
+on:
+  workflow_dispatch:  # manual trigger only
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run audit
+        env:
+          ZOHO_CLIENT_ID: ${{ secrets.ZOHO_CLIENT_ID }}
+          ZOHO_CLIENT_SECRET: ${{ secrets.ZOHO_CLIENT_SECRET }}
+          ZOHO_REFRESH_TOKEN: ${{ secrets.ZOHO_REFRESH_TOKEN }}
+          ZOHO_API_DOMAIN: ${{ secrets.ZOHO_API_DOMAIN }}
+          ZOHO_ACCOUNTS_DOMAIN: ${{ secrets.ZOHO_ACCOUNTS_DOMAIN }}
+        run: python zoho_audit.py
+
+      - name: Upload CSVs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zoho-audit-csvs
+          path: audit_output/
+          retention-days: 7
