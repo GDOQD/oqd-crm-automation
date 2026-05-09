@@ -19,6 +19,9 @@ REFRESH_TOKEN = os.environ["ZOHO_REFRESH_TOKEN"]
 API_DOMAIN = os.environ["ZOHO_API_DOMAIN"]
 ACCOUNTS_DOMAIN = os.environ["ZOHO_ACCOUNTS_DOMAIN"]
 
+# Zoho CRM API version. v2 is long-stable across all datacenters.
+API_VERSION = "v2"
+
 # Modules to audit. Start with the standard B2B four.
 MODULES = ["Leads", "Contacts", "Accounts", "Deals"]
 
@@ -51,7 +54,7 @@ def fetch_module_records(module, access_token):
     per_page = 200
 
     while True:
-        url = f"{API_DOMAIN}/crm/v6/{module}"
+        url = f"{API_DOMAIN}/crm/{API_VERSION}/{module}"
         params = {"page": page, "per_page": per_page}
         r = requests.get(url, headers=headers, params=params, timeout=30)
 
@@ -60,10 +63,13 @@ def fetch_module_records(module, access_token):
             break
         if r.status_code == 401:
             raise RuntimeError(f"Auth failed on {module}: {r.text}")
+        if not r.ok:
+            # Surface the actual Zoho error message
+            raise RuntimeError(
+                f"{module} request failed: HTTP {r.status_code} - {r.text}"
+            )
 
-        r.raise_for_status()
         payload = r.json()
-
         batch = payload.get("data", [])
         records.extend(batch)
 
@@ -78,10 +84,13 @@ def fetch_module_records(module, access_token):
 def fetch_module_fields(module, access_token):
     """Get the list of fields (including custom) defined on a module."""
     headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
-    url = f"{API_DOMAIN}/crm/v6/settings/fields"
+    url = f"{API_DOMAIN}/crm/{API_VERSION}/settings/fields"
     params = {"module": module}
     r = requests.get(url, headers=headers, params=params, timeout=30)
-    r.raise_for_status()
+    if not r.ok:
+        raise RuntimeError(
+            f"{module} fields request failed: HTTP {r.status_code} - {r.text}"
+        )
     return r.json().get("fields", [])
 
 
@@ -163,6 +172,7 @@ def main():
     print("✓ Got access token\n")
 
     print(f"Auditing modules: {', '.join(MODULES)}")
+    print(f"Using API version: {API_VERSION}")
 
     for module in MODULES:
         try:
